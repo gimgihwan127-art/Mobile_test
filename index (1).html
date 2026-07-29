@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VCC 2025</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{
+    background:#000;
+    overflow-x:hidden;
+    height:100%;
+  }
+
+  /* scroll-stage 높이 = 영상 러닝타임을 스크롤에 매핑하는 구간.
+     video-pin(100vh)이 sticky로 붙어있는 동안 이 구간만큼 스크롤이 진행됨.
+     끝까지 스크롤했을 때 딱 마지막 프레임에서 페이지도 끝나도록 구성. */
+  .scroll-stage{
+    position:relative;
+    height:300vh;
+  }
+
+  .video-pin{
+    position:sticky;
+    top:0;
+    height:100vh;
+    width:100%;
+    overflow:hidden;
+    background:#000;
+  }
+
+  video{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .preload{
+    position:fixed;
+    inset:0;
+    background:#000;
+    z-index:50;
+    transition:opacity .5s ease;
+  }
+  .preload.hide{opacity:0;pointer-events:none;}
+</style>
+</head>
+<body>
+
+<div class="preload" id="preload"></div>
+
+<div class="scroll-stage" id="stage">
+  <div class="video-pin">
+    <video id="scrubVideo" muted playsinline preload="auto">
+      <!-- 뷰포트 폭이 768px 이하면 모바일 전용 소스를 로드, 아니면 데스크톱 소스.
+           브라우저가 로드 시점에 한 번만 매칭하므로 둘 다 동시에 받지 않음. -->
+      <source src="vcc-video-mobile.mp4" type="video/mp4" media="(max-width: 768px)">
+      <source src="vcc-video.mp4" type="video/mp4">
+    </video>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+const video = document.getElementById('scrubVideo');
+const preload = document.getElementById('preload');
+const stage = document.getElementById('stage');
+
+// poster는 <source media>처럼 자동 분기가 안 되므로 JS에서 직접 지정
+video.poster = window.matchMedia('(max-width: 768px)').matches
+  ? 'poster-mobile.jpg'
+  : 'poster.jpg';
+
+let ready = false;
+
+function initScrub(){
+  if(ready) return;
+  ready = true;
+  preload.classList.add('hide');
+
+  const scrubTarget = { t: 0 };
+
+  ScrollTrigger.create({
+    trigger: stage,
+    start: 'top top',
+    end: 'bottom bottom', // stage 끝 = 스크롤 끝 = 영상 마지막 프레임, 남는 공백 없음
+    scrub: 0.4,
+    onUpdate: (self) => {
+      const duration = video.duration || 0;
+      gsap.to(scrubTarget, {
+        t: self.progress * duration,
+        duration: 0.15,
+        ease: 'none',
+        overwrite: true,
+        onUpdate: () => { video.currentTime = scrubTarget.t; }
+      });
+    }
+  });
+}
+
+if (video.readyState >= 1){
+  initScrub();
+} else {
+  video.addEventListener('loadedmetadata', initScrub, {once:true});
+}
+setTimeout(() => { if(!ready) initScrub(); }, 4000);
+
+if (window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  video.muted = true;
+  video.play().catch(()=>{});
+}
+</script>
+</body>
+</html>
